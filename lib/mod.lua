@@ -20,15 +20,26 @@ local STYLES = { "poly", "mono", "perc" }
 local POLY, MONO, PERC = 1, 2, 3
 -- the params whose names follow the model, in the order of engine.controls
 local CONTROL_PARAMS = { "harmonics", "timbre", "morph", "macro" }
-local UGEN_DIRS = {
-  os.getenv("HOME") .. "/.local/share/SuperCollider/Extensions",
-  "/usr/local/share/SuperCollider/Extensions",
-  "/usr/share/SuperCollider/Extensions",
-  "/usr/local/lib/SuperCollider/plugins",
-  "/usr/lib/SuperCollider/plugins",
+
+-- the UGen is downloaded and installed by norns-deps (lib/deps)
+local deps = dofile(_path.code .. mod_name .. "/lib/deps.lua")
+local d = deps.new { name = "nb_pp", dir = DATA_DIR .. "deps" }
+d:add {
+  id = "nb_pp", label = "PlaitsPalette UGen", size = "0.4 MB",
+  why = "the synthesis engines",
+  check_ugens = "PlaitsPalette",
+  -- built on the device and attached to a release; a new build goes in a
+  -- new release (ugen-2), with its checksum here
+  ugens = "https://github.com/vehka/nb_pp/releases/download/ugen-1/"
+    .. "PlaitsPalette-{arch}.tar.gz",
+  sha256 = {
+    armv7l = "5ac1de2b9c04a21151b581a437c38c5a5a0974c134ca396c8521fdae831a9bef",
+  },
+  manual = "build it: ugen/build.sh install (see README)",
 }
 
 -- disabled[engine id] = true: the model param skips the engine
+-- no_prompt: the install offer was turned down, don't open it at every script
 local prefs = { disabled = {} }
 
 local function read_prefs()
@@ -36,6 +47,7 @@ local function read_prefs()
     local saved = tab.load(PREFS_FILE)
     if type(saved) == "table" and type(saved.disabled) == "table" then
       prefs.disabled = saved.disabled
+      prefs.no_prompt = saved.no_prompt
     end
   end
 end
@@ -50,9 +62,16 @@ local function enabled(index)
 end
 
 local function ugen_installed()
-  local out = util.os_capture("find " .. table.concat(UGEN_DIRS, " ")
-    .. " -name 'PlaitsPalette.s[oc]*' 2>/dev/null | head -n 1")
-  return out ~= ""
+  return d:ok("nb_pp")
+end
+
+-- open the installer screen; on_close runs when it has closed
+local function install_ugen(on_close)
+  d:ensure({ "nb_pp" }, { on_done = function(ok)
+    prefs.no_prompt = (not ok) or nil
+    write_prefs()
+    if on_close then on_close() end
+  end })
 end
 
 local function send(path, args)
@@ -295,12 +314,20 @@ end
 
 mod.hook.register("script_pre_init", "nb_pp pre init", function()
   read_prefs()
-  if not ugen_installed() then
-    print("nb_pp: PlaitsPalette UGen not installed, voices will be silent."
-      .. " see the README (ugen/build.sh)")
-  end
   for i = 1, NUM_VOICES do
     add_player(i)
+  end
+end)
+
+-- offer to install the UGen, or to restart after an install. once turned
+-- down, the offer stays in the mod menu only.
+mod.hook.register("script_post_init", "nb_pp post init", function()
+  if d:restart_pending() then
+    install_ugen()
+  elseif not ugen_installed() then
+    print("nb_pp: PlaitsPalette UGen not installed, voices will be silent."
+      .. " install it from SYSTEM > MODS > NB_PP")
+    if not prefs.no_prompt then install_ugen() end
   end
 end)
 
@@ -312,7 +339,7 @@ end)
 -- mod menu: which engines the model param steps through
 --
 -- E2 scroll, E3 jump to the next family, K3 toggle an engine (or, on a
--- family line, the whole family), K2 back.
+-- family line, the whole family), K2 back. without the UGen, K3 installs it.
 
 local ROWS = 6
 
@@ -367,6 +394,8 @@ function m.key(n, z)
   if z ~= 1 then return end
   if n == 2 then
     mod.menu.exit()
+  elseif n == 3 and not m.ugen then
+    install_ugen(function() m.ugen = ugen_installed() end)
   elseif n == 3 then
     local row = m.rows[m.pos]
     if row.engine then
@@ -401,7 +430,7 @@ function m.redraw()
   screen.clear()
   screen.level(4)
   screen.move(0, 7)
-  screen.text(m.ugen and "NB_PP" or "NB_PP: UGEN NOT INSTALLED")
+  screen.text(m.ugen and "NB_PP" or "NB_PP: K3 INSTALL UGEN")
   local all = {}
   for index = 1, #engines do all[index] = index end
   screen.move(127, 7)

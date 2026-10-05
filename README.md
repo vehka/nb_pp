@@ -5,29 +5,36 @@
 of Rubato Audio's Plaits firmware, four voices (`palette 1` to `palette 4`),
 each polyphonic.
 
-This is an early version. It has been tested on desktop norns only, not yet
-on a norns or shield.
+This is an early version. It has been tested on desktop norns and on a norns
+shield (Raspberry Pi 3, 32-bit).
 
 ## Install
 
-1. Put this repository in `dust/code/nb_pp`, with its submodules:
+1. Put this repository in `dust/code/nb_pp`:
 
    ```sh
    cd ~/dust/code
-   git clone --recurse-submodules https://github.com/vehka/nb_pp
+   git clone https://github.com/vehka/nb_pp
    ```
 
-2. Build and install the SuperCollider UGen. This needs `cmake`, a C++17
-   compiler and the SuperCollider plugin headers (or a SuperCollider source
-   tree, given as `SC_PATH=...`):
+2. Enable the mod in SYSTEM > MODS and restart.
 
-   ```sh
-   ~/dust/code/nb_pp/ugen/build.sh install
-   ```
+3. Load any script. The mod offers to download the SuperCollider UGen it
+   needs (0.4 MB): K3 installs it, then K3 again restarts norns. If you turn
+   the offer down, it is still in SYSTEM > MODS > NB_PP (K3).
 
-   It compiles about 120 files, which takes a while on a norns.
+The download is a prebuilt UGen for 32-bit norns and shields (`armv7l`). On
+anything else (desktop norns, a 64-bit system) build it yourself. This needs
+`cmake`, a C++17 compiler and the SuperCollider plugin headers (or a
+SuperCollider source tree, given as `SC_PATH=...`); the script fetches the
+submodules:
 
-3. Enable the mod in SYSTEM > MODS and restart.
+```sh
+~/dust/code/nb_pp/ugen/build.sh install
+```
+
+It compiles about 120 files, which takes a while on a norns. Restart
+afterwards.
 
 Without the UGen the mod still loads; the voices are silent and the mod menu
 says so.
@@ -82,6 +89,12 @@ without its own arpeggio envelope.
   `lib/engines.lua`, keeping the order so saved params stay valid), then
   rebuild and reinstall the UGen. The Lua list and the UGen must come from
   the same submodule revision.
+- The prebuilt UGen is a release asset (`ugen-1`), named in `lib/mod.lua`
+  with its checksum. After rebuilding on a device:
+  `tar -czf PlaitsPalette-$(uname -m).tar.gz -C ugen/build PlaitsPalette.so`,
+  attach it to a new release (`ugen-2`) and update the URL and `sha256`.
+- `lib/deps.lua` and `lib/deps/` are a copy of
+  [norns-deps](https://github.com/vehka/norns-deps), which runs the install.
 - `ugen/build/pp_host_test` plays every engine without SuperCollider and
   checks that it sounds, stays finite and falls silent after release.
 
