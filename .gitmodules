@@ -1,0 +1,3 @@
+[submodule "ugen/eurorack"]
+	path = ugen/eurorack
+	url = https://github.com/lylepmills/eurorack
