@@ -16,10 +16,11 @@ PlaitsPalette : MultiOutUGen {
 // lib/mod.lua. Each nb voice has a group and a note -> synth table.
 NbPP {
 	classvar <numVoices = 4;
-	classvar <notes, <groups;
+	classvar <notes, <groups, <engineOf;
 
 	*initClass {
 		notes = numVoices.collect { Dictionary.new };
+		engineOf = IdentityDictionary.new;
 
 		StartUp.add {
 			// after a server boot or cmd-period the old groups are gone
@@ -81,6 +82,13 @@ NbPP {
 				var voice = msg[1].asInteger;
 				var oldNote = msg[2].asInteger, note = msg[3].asInteger;
 				var syn = notes[voice][oldNote];
+				// a synth keeps the engine it started with: a changed model
+				// needs a new one
+				if(syn.notNil and: { engineOf[syn] != this.engineIn(msg[4..]) }) {
+					syn.set(\gate, 0);
+					notes[voice].removeAt(oldNote);
+					syn = nil;
+				};
 				if(syn.notNil) {
 					syn.set(\gate, 1, *msg[4..]);
 					if(note != oldNote) {
@@ -121,9 +129,16 @@ NbPP {
 		}
 	}
 
+	// the engine in a key, value argument list
+	*engineIn { |args|
+		var at = args.indexOf(\engine);
+		^at !? { args[at + 1].asInteger };
+	}
+
 	*makeGroups {
 		groups = numVoices.collect { Group.new(Server.default) };
 		notes.do { |dict| dict.clear };
+		engineOf.clear;
 	}
 
 	*spawn { |voice, args|
@@ -133,10 +148,12 @@ NbPP {
 			\sendABus, (~sendA ? Server.default.outputBus),
 			\sendBBus, (~sendB ? Server.default.outputBus)
 		], target: groups[voice]);
+		engineOf[syn] = this.engineIn(args);
 		syn.onFree({
 			// forget it, unless the note has been taken over by a newer synth
 			var note = notes[voice].findKeyForValue(syn);
 			note !? { notes[voice].removeAt(note) };
+			engineOf.removeAt(syn);
 		});
 		^syn;
 	}
