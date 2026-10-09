@@ -10,12 +10,7 @@ shield (Raspberry Pi 3, 32-bit).
 
 ## Install
 
-1. Put this repository in `dust/code/nb_pp`:
-
-   ```sh
-   cd ~/dust/code
-   git clone https://github.com/vehka/nb_pp
-   ```
+1. in matron, enter `;install https://github.com/vehka/nb_pp`
 
 2. Enable the mod in SYSTEM > MODS and restart.
 
